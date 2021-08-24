@@ -94,18 +94,20 @@ struct mu_thread { mu_mule *mule; size_t idx; thrd_t thread; };
 
 struct mu_mule
 {
-    _Atomic(bool)    running;
-    _Atomic(size_t)  queued;          /* consider aligning these */
-    _Atomic(size_t)  processing;      /* counters so they have */
-    _Atomic(size_t)  processed;       /* dedicated cache lines. */
     mtx_t            mutex;
     cnd_t            wake_dispatcher;
     cnd_t            wake_worker;
     void*            userdata;
     mumule_work_fn   kernel;
     size_t           num_threads;
+    _Atomic(size_t)  running;
     _Atomic(size_t)  threads_running;
+
     mu_thread        threads[mumule_max_threads];
+
+    ALIGNED(64) _Atomic(size_t)  queued;
+    ALIGNED(64) _Atomic(size_t)  processing;
+    ALIGNED(64) _Atomic(size_t)  processed;
 };
 ```
 
