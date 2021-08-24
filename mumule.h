@@ -110,6 +110,7 @@ static int mule_thread(void *arg)
         /* sleep on condition if queue empty or exit if asked to stop */
         if (processing == queued)
         {
+            debugf("mule_thread-%zu: queue-empty\n", thread_idx);
             mtx_lock(&mule->mutex);
             if (!atomic_load(&mule->running)) {
                 mtx_unlock(&mule->mutex);
