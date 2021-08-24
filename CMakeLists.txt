@@ -5,6 +5,11 @@ project(mule)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+option(MULE_ENABLE_ASAN "Enable ASAN" OFF)
+option(MULE_ENABLE_MSAN "Enable MSAN" OFF)
+option(MULE_ENABLE_TSAN "Enable TSAN" OFF)
+option(MULE_ENABLE_UBSAN "Enable UBSAN" OFF)
+
 macro(add_compiler_flag)
    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${ARGN}")
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${ARGN}")
@@ -23,6 +28,26 @@ if (has_march_x86_64_v3)
 	add_compiler_flag(-march=x86-64-v3)
 elseif (has_march_haswell)
 	add_compiler_flag(-march=haswell)
+endif()
+
+if (MULE_ENABLE_ASAN)
+  add_compiler_flag(-fsanitize=address)
+  add_linker_flag(-fsanitize=address)
+endif()
+
+if(MULE_ENABLE_MSAN)
+  add_compiler_flag(-fsanitize=memory)
+  add_linker_flag(-fsanitize=memory)
+endif()
+
+if(MULE_ENABLE_TSAN)
+  add_compiler_flag("-fPIE -fsanitize=thread")
+  add_linker_flag("-fPIE -fsanitize=thread")
+endif()
+
+if(MULE_ENABLE_UBSAN)
+  add_compiler_flag(-fsanitize=undefined)
+  add_linker_flag(-fsanitize=undefined)
 endif()
 
 # check for the C thread support library
