@@ -34,6 +34,8 @@ counters within a critical section guarded by the queue mutex, however, the
 goal is to avoid locking and unlocking a mutex which may add up to tens of
 microseconds between each work item.
 
+### queue-complete edge signal
+
 The issue occurs in _mumule_ while attempting to precisely `cnd_signal` the
 _queue-complete_ edge from the worker processing the last item to the
 dispatcher `cnd_wait` in `mule_synchronize`. The code tries to do this
