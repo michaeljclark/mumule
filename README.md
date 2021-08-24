@@ -219,3 +219,7 @@ mule_thread-0: worker-woke
 mule_thread-0: worker-exiting
 
 ```
+
+## license
+
+_mumule_ source code is released under an ISC License.
