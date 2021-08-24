@@ -111,6 +111,49 @@ struct mu_mule
 };
 ```
 
+### mumule api
+
+The following is a brief description of the _mumule_ api:
+
+#### `void mule_init(mu_mule *, size_t nthreads, work_fn kernel, void *userdata);`
+
+Initialize mu_mule, set number of threads, kernel function and userdata pointer.
+the `kernel` function takes three arguments: `void *userdata` — pointer passed
+to `mule_init`, `size_t thr_idx` — the thread index _(0 ... nthreads)_
+and `item_idx` — the workitem index _(0 ... nqueued)_ which is added to with
+the `count` argument of `mule_submit`.
+
+```
+    typedef void(*mumule_work_fn)(void *arg, size_t thr_idx, size_t item_idx);
+```
+
+#### `int mule_launch(mu_mule *);`
+
+Start threads and process workitems. `mule_launch` can be called either before
+or after `mule_submit`.
+
+#### `size_t mule_submit(mu_mule *, size_t count);`
+
+Add `count` to the queued limit of workitems. successive calls to `mule_submit`
+will atomically add to `count` and notify worker threads that there is work.
+
+#### `int mule_synchronize(mu_mule *);`
+
+Wait for worker threads to complete all outstanding workitems in the queue.
+
+#### `int mule_reset(mu_mule *);`
+
+Synchronizes on the queue then resets all counters to zero.
+
+#### `int mule_shutdown(mu_mule *);`
+
+Shuts down threads. the user can start them again with `mule_launch`.
+
+#### `int mule_destroy(mu_mule *);`
+
+Shuts down threads then frees resources _(mutexes and condition variables)_.
+
+
 ## example program
 
 The following example launches two threads with eight workitems.
