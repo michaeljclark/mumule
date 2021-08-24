@@ -75,18 +75,10 @@ and `mule_synchronize`:
 
 ## mumule interface
 
-These definitions give a summary of the _mumule_ API interface.
+These definitions give a summary of the _mumule_ data structure:
 
 ```
 typedef void(*mumule_work_fn)(void *arg, size_t thr_idx, size_t item_idx);
-
-static void mule_init(mu_mule *mule, size_t num_threads, mumule_work_fn kernel, void *userdata);
-static size_t mule_submit(mu_mule *mule, size_t count);
-static int mule_launch(mu_mule *mule);
-static int mule_synchronize(mu_mule *mule);
-static int mule_reset(mu_mule *mule);
-static int mule_shutdown(mu_mule *mule);
-static int mule_destroy(mu_mule *mule);
 
 enum { mumule_max_threads = 8 };
 
