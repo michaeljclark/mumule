@@ -189,27 +189,23 @@ cmake --build build -- --verbose
 Run with `build/test_mumule -v` to enable verbose debug messages:
 
 ```
+mule_submit: queue-start
 mule_start: starting-threads
 mule_sync: quench-queue
 mule_thread-0: worker-started
-arg=(nil) thr_idx=0 item_idx=1
-arg=(nil) thr_idx=0 item_idx=2
-arg=(nil) thr_idx=0 item_idx=3
-arg=(nil) thr_idx=0 item_idx=4
 mule_thread-1: worker-started
+arg=(nil) thr_idx=1 item_idx=2
+arg=(nil) thr_idx=1 item_idx=3
+arg=(nil) thr_idx=1 item_idx=4
+arg=(nil) thr_idx=1 item_idx=5
 arg=(nil) thr_idx=1 item_idx=6
+arg=(nil) thr_idx=0 item_idx=1
+arg=(nil) thr_idx=0 item_idx=8
 arg=(nil) thr_idx=1 item_idx=7
-arg=(nil) thr_idx=1 item_idx=8
-arg=(nil) thr_idx=0 item_idx=5
-mule_thread-0: signal-dispatcher
-mule_thread-1: worker-sleeping
-mule_thread-0: worker-sleeping
-mule_sync: stopping-threads
-mule_thread-1: worker-woke
+mule_sync: queue-complete
+mule_stop: stopping-threads
 mule_thread-1: worker-exiting
-mule_thread-0: worker-woke
 mule_thread-0: worker-exiting
-
 ```
 
 ## license

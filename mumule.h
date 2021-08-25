@@ -301,6 +301,8 @@ static int mule_sync(mu_mule *mule)
     };
     mtx_unlock(&mule->mutex);
 
+    debugf("mule_sync: queue-complete\n");
+
     return 0;
 }
 
