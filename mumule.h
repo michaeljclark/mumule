@@ -227,7 +227,11 @@ static size_t mule_submit(mu_mule *mule, size_t count)
 
 static int mule_start(mu_mule *mule)
 {
-    if (atomic_load(&mule->running)) return 0;
+    mtx_lock(&mule->mutex);
+    if (atomic_load(&mule->running)) {
+        mtx_unlock(&mule->mutex);
+        return 0;
+    }
 
     debugf("mule_start: starting-threads\n");
     for (size_t idx = 0; idx < mule->num_threads; idx++) {
@@ -240,6 +244,7 @@ static int mule_start(mu_mule *mule)
     for (size_t i = 0; i < mule->num_threads; i++) {
         assert(!thrd_create(&mule->threads[i].thread, mule_thread, &mule->threads[i]));
     }
+    mtx_unlock(&mule->mutex);
     return 0;
 }
 
@@ -298,12 +303,15 @@ static int mule_reset(mu_mule *mule)
 
 static int mule_stop(mu_mule *mule)
 {
-    if (!atomic_load(&mule->running)) return 0;
+    mtx_lock(&mule->mutex);
+    if (!atomic_load(&mule->running)) {
+        mtx_unlock(&mule->mutex);
+        return 0;
+    }
 
     /* shutdown workers */
     debugf("mule_stop: stopping-threads\n");
 
-    mtx_lock(&mule->mutex);
     atomic_store_explicit(&mule->running, 0, __ATOMIC_RELEASE);
     mtx_unlock(&mule->mutex);
     cnd_broadcast(&mule->wake_worker);
