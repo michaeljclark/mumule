@@ -49,7 +49,7 @@ typedef struct mu_thread mu_thread;
 /*
  * mumule thread pool:
  *
- * - `mule_init(mule,nthreads,kernel,userdata)` to initialize the queue
+ * - `mule_init(mule, nthreads, kernel, userdata)` to initialize the queue
  * - `mule_start(mule)` to start threads
  * - `mule_stop(mule)` to stop threads
  * - `mule_submit(mule,n)` to queue work
