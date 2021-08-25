@@ -3,10 +3,10 @@
 > simple thread pool implementation using the C11 thread support library.
 
  - `mule_init(mule,nthreads,kernel,userdata)` to initialize the queue
- - `mule_launch(mule)` to start threads
- - `mule_shutdown(mule)` to stop threads
+ - `mule_start(mule)` to start threads
+ - `mule_stop(mule)` to stop threads
  - `mule_submit(mule,n)` to queue work
- - `mule_synchronize(mule)` to quench the queue
+ - `mule_sync(mule)` to quench the queue
  - `mule_reset(mule)` to clear counters
 
 _mumule_ is a simple thread worker pool that dispatches one dimension of work
@@ -38,7 +38,7 @@ microseconds between each work item.
 
 The issue occurs in _mumule_ while attempting to precisely `cnd_signal` the
 _queue-complete_ edge from the worker processing the last item to the
-dispatcher `cnd_wait` in `mule_synchronize`. The code tries to do this
+dispatcher `cnd_wait` in `mule_sync`. The code tries to do this
 precisely but the problem occurs between checking the _queue-complete_
 condition and sleeping, whereby one can miss a state change if pre-empted
 between checking the condition _(processed < queued)_ and calling `cnd_wait`
@@ -65,7 +65,7 @@ see `mule_thread`:
         }
 ```
 
-and `mule_synchronize`:
+and `mule_sync`:
 ```
         /* wait for queue to quench */
         if (processed < queued) {
@@ -119,9 +119,9 @@ the `count` argument of `mule_submit`.
     typedef void(*mumule_work_fn)(void *arg, size_t thr_idx, size_t item_idx);
 ```
 
-#### `int mule_launch(mu_mule *);`
+#### `int mule_start(mu_mule *);`
 
-Start threads and process workitems. `mule_launch` can be called either before
+Start threads and process workitems. `mule_start` can be called either before
 or after `mule_submit`.
 
 #### `size_t mule_submit(mu_mule *, size_t count);`
@@ -129,7 +129,7 @@ or after `mule_submit`.
 Add `count` to the queued limit of workitems. successive calls to `mule_submit`
 will atomically add to `count` and notify worker threads that there is work.
 
-#### `int mule_synchronize(mu_mule *);`
+#### `int mule_sync(mu_mule *);`
 
 Wait for worker threads to complete all outstanding workitems in the queue.
 
@@ -137,9 +137,9 @@ Wait for worker threads to complete all outstanding workitems in the queue.
 
 Synchronizes on the queue then resets all counters to zero.
 
-#### `int mule_shutdown(mu_mule *);`
+#### `int mule_stop(mu_mule *);`
 
-Shuts down threads. the user can start them again with `mule_launch`.
+Shuts down threads. the user can start them again with `mule_start`.
 
 #### `int mule_destroy(mu_mule *);`
 
@@ -168,9 +168,9 @@ int main(int argc, const char **argv)
 
     mule_init(&mule, 2, work, NULL);
     mule_submit(&mule, 8);
-    mule_launch(&mule);
-    mule_synchronize(&mule);
-    mule_shutdown(&mule);
+    mule_start(&mule);
+    mule_sync(&mule);
+    mule_stop(&mule);
     mule_destroy(&mule);
 
     assert(atomic_load(&counter) == 8);
@@ -189,8 +189,8 @@ cmake --build build -- --verbose
 Run with `build/test_mumule -v` to enable verbose debug messages:
 
 ```
-mule_launch: starting-threads
-mule_synchronize: quench-queue
+mule_start: starting-threads
+mule_sync: quench-queue
 mule_thread-0: worker-started
 arg=(nil) thr_idx=0 item_idx=1
 arg=(nil) thr_idx=0 item_idx=2
@@ -204,7 +204,7 @@ arg=(nil) thr_idx=0 item_idx=5
 mule_thread-0: signal-dispatcher
 mule_thread-1: worker-sleeping
 mule_thread-0: worker-sleeping
-mule_synchronize: stopping-threads
+mule_sync: stopping-threads
 mule_thread-1: worker-woke
 mule_thread-1: worker-exiting
 mule_thread-0: worker-woke

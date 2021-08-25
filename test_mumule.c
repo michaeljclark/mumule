@@ -18,9 +18,9 @@ void t1()
 	mu_mule mule;
 	mule_init(&mule, 2, w1, NULL);
 	mule_submit(&mule, 8);
-	mule_launch(&mule);
-	mule_synchronize(&mule);
-	mule_shutdown(&mule);
+	mule_start(&mule);
+	mule_sync(&mule);
+	mule_stop(&mule);
 	mule_destroy(&mule);
 	assert(atomic_load(&counter) == 8);
 }

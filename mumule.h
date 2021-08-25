@@ -50,10 +50,10 @@ typedef struct mu_thread mu_thread;
  * mumule thread pool:
  *
  * - `mule_init(mule,nthreads,kernel,userdata)` to initialize the queue
- * - `mule_launch(mule)` to start threads
- * - `mule_shutdown(mule)` to stop threads
+ * - `mule_start(mule)` to start threads
+ * - `mule_stop(mule)` to stop threads
  * - `mule_submit(mule,n)` to queue work
- * - `mule_synchronize(mule)` to quench the queue
+ * - `mule_sync(mule)` to quench the queue
  * - `mule_reset(mule)` to clear counters
  *
  * mumule example program:
@@ -63,9 +63,9 @@ typedef struct mu_thread mu_thread;
  *
  *     mule_init(&mule, 2, w1, NULL);
  *     mule_submit(&mule, 8);
- *     mule_launch(&mule);
- *     mule_synchronize(&mule);
- *     mule_shutdown(&mule);
+ *     mule_start(&mule);
+ *     mule_sync(&mule);
+ *     mule_stop(&mule);
  *     mule_destroy(&mule);
  * }
  *
@@ -75,10 +75,10 @@ typedef void(*mumule_work_fn)(void *arg, size_t thr_idx, size_t item_idx);
 
 static void mule_init(mu_mule *mule, size_t num_threads, mumule_work_fn kernel, void *userdata);
 static size_t mule_submit(mu_mule *mule, size_t count);
-static int mule_launch(mu_mule *mule);
-static int mule_synchronize(mu_mule *mule);
+static int mule_start(mu_mule *mule);
+static int mule_sync(mu_mule *mule);
 static int mule_reset(mu_mule *mule);
-static int mule_shutdown(mu_mule *mule);
+static int mule_stop(mu_mule *mule);
 static int mule_destroy(mu_mule *mule);
 
 enum {
@@ -225,11 +225,11 @@ static size_t mule_submit(mu_mule *mule, size_t count)
     return idx + count;
 }
 
-static int mule_launch(mu_mule *mule)
+static int mule_start(mu_mule *mule)
 {
     if (atomic_load(&mule->running)) return 0;
 
-    debugf("mule_launch: starting-threads\n");
+    debugf("mule_start: starting-threads\n");
     for (size_t idx = 0; idx < mule->num_threads; idx++) {
         mule->threads[idx].mule = mule;
         mule->threads[idx].idx = idx;
@@ -243,11 +243,11 @@ static int mule_launch(mu_mule *mule)
     return 0;
 }
 
-static int mule_synchronize(mu_mule *mule)
+static int mule_sync(mu_mule *mule)
 {
     size_t queued, processed;
 
-    debugf("mule_synchronize: quench-queue\n");
+    debugf("mule_sync: quench-queue\n");
     cnd_broadcast(&mule->wake_worker);
 
     /* wait for queue to quench */
@@ -271,9 +271,9 @@ static int mule_synchronize(mu_mule *mule)
              *  \
              *   +
              */
-            tracef("mule_synchronize: queue-processing\n");
+            tracef("mule_sync: queue-processing\n");
             cnd_timedwait(&mule->wake_dispatcher, &mule->mutex, &abstime);
-            tracef("mule_synchronize: dispatcher-woke\n");
+            tracef("mule_sync: dispatcher-woke\n");
         } else {
             break;
         }
@@ -285,7 +285,7 @@ static int mule_synchronize(mu_mule *mule)
 
 static int mule_reset(mu_mule *mule)
 {
-    mule_synchronize(mule);
+    mule_sync(mule);
 
     atomic_store(&mule->queued, 0);
     atomic_store(&mule->processing, 0);
@@ -296,12 +296,12 @@ static int mule_reset(mu_mule *mule)
     return 0;
 }
 
-static int mule_shutdown(mu_mule *mule)
+static int mule_stop(mu_mule *mule)
 {
     if (!atomic_load(&mule->running)) return 0;
 
     /* shutdown workers */
-    debugf("mule_shutdown: stopping-threads\n");
+    debugf("mule_stop: stopping-threads\n");
 
     mtx_lock(&mule->mutex);
     atomic_store_explicit(&mule->running, 0, __ATOMIC_RELEASE);
@@ -319,7 +319,7 @@ static int mule_shutdown(mu_mule *mule)
 
 static int mule_destroy(mu_mule *mule)
 {
-    mule_shutdown(mule);
+    mule_stop(mule);
 
     mtx_destroy(&mule->mutex);
     cnd_destroy(&mule->wake_worker);
