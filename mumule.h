@@ -39,6 +39,8 @@
 extern "C" {
 #endif
 
+typedef long long llong;
+
 struct mu_mule;
 typedef struct mu_mule mu_mule;
 struct mu_thread;
@@ -79,7 +81,17 @@ static int mule_reset(mu_mule *mule);
 static int mule_shutdown(mu_mule *mule);
 static int mule_destroy(mu_mule *mule);
 
-enum { mumule_max_threads = 8 };
+enum {
+    mumule_max_threads = 8,
+
+    /*
+     * condition revalidation timeouts - time between revalidation of the
+     * work available condition is 100Hz (10 ms) because the workers will
+     * usually
+     */
+    mumule_revalidate_work_available_ns = 10000000, /* 10 milliseconds */
+    mumule_revalidate_queue_complete_ns = 1000000,  /* 1 millisecond */
+};
 
 struct mu_thread { mu_mule *mule; size_t idx; thrd_t thread; };
 
@@ -105,6 +117,14 @@ struct mu_mule
  * mumule implementation
  */
 
+static inline struct timespec _timespec_add(struct timespec abstime, llong reltime)
+{
+    llong tv_nsec = abstime.tv_nsec + reltime;
+    abstime.tv_nsec = tv_nsec % 1000000000;
+    abstime.tv_sec = tv_nsec / 1000000000;
+    return abstime;
+}
+
 static void mule_init(mu_mule *mule, size_t num_threads, mumule_work_fn kernel, void *userdata)
 {
     memset(mule, 0, sizeof(mu_mule));
@@ -125,10 +145,13 @@ static int mule_thread(void *arg)
     size_t queued, processing, workitem, processed;
 
     debugf("mule_thread-%zu: worker-started\n", thread_idx);
-
     atomic_fetch_add_explicit(&mule->threads_running, 1, __ATOMIC_RELAXED);
 
     for (;;) {
+        struct timespec abstime = { 0 };
+        assert(!clock_gettime(CLOCK_REALTIME, &abstime));
+        abstime = _timespec_add(abstime, mumule_revalidate_work_available_ns);
+
         /* find out how many items still need processing */
         queued = atomic_load_explicit(&mule->queued, __ATOMIC_ACQUIRE);
         processing = atomic_load_explicit(&mule->processing, __ATOMIC_ACQUIRE);
@@ -136,16 +159,30 @@ static int mule_thread(void *arg)
         /* sleep on condition if queue empty or exit if asked to stop */
         if (processing == queued)
         {
-            debugf("mule_thread-%zu: queue-empty\n", thread_idx);
+            tracef("mule_thread-%zu: queue-empty\n", thread_idx);
+
             mtx_lock(&mule->mutex);
             if (!atomic_load(&mule->running)) {
                 mtx_unlock(&mule->mutex);
                 break;
             }
-            debugf("mule_thread-%zu: worker-sleeping\n", thread_idx);
-            cnd_wait(&mule->wake_worker, &mule->mutex);
+
+            /*
+             * +
+             * |
+             * | [queue-empty] -> [queue-processing]
+             * |
+             * | [worker-lost-wakeup] condition change missed by
+             * | the worker if pre-empted before cnd_wait so we
+             * | use cond_timedwait and loop to recheck the condition.
+             *  \
+             *   +
+             */
+            tracef("mule_thread-%zu: queue-empty\n", thread_idx);
+            cnd_timedwait(&mule->wake_worker, &mule->mutex, &abstime);
+            tracef("mule_thread-%zu: worker-woke\n", thread_idx);
             mtx_unlock(&mule->mutex);
-            debugf("mule_thread-%zu: worker-woke\n", thread_idx);
+
             continue;
         }
 
@@ -158,19 +195,23 @@ static int mule_thread(void *arg)
 
         /* signal dispatcher precisely when the last item is processed */
         if (processed + 1 == queued) {
-            debugf("mule_thread-%zu: signal-dispatcher\n", thread_idx);
+            tracef("mule_thread-%zu: queue-complete\n", thread_idx);
             /*
-             * [lost-wakeup-issue]
-             *
-             * dispatcher can pre-empted before cnd_wait so the dispatcher
-             * uses cond_timedwait. needs edge triggered conditions.
+             *   +
+             *  /
+             * | [dispatcher-lost-wakeup] condition change missed by
+             * | the dispatcher if pre-empted before cnd_wait so we
+             * | use cond_timedwait and loop to recheck the condition.
+             * |
+             * | [queue-processing] -> [queue-complete]
+             * |
+             * +
              */
             cnd_signal(&mule->wake_dispatcher);
         }
     }
 
     atomic_fetch_add_explicit(&mule->threads_running, -1, __ATOMIC_RELAXED);
-
     debugf("mule_thread-%zu: worker-exiting\n", thread_idx);
 
     return 0;
@@ -178,6 +219,7 @@ static int mule_thread(void *arg)
 
 static size_t mule_submit(mu_mule *mule, size_t count)
 {
+    debugf("mule_submit: queue-start\n");
     size_t idx = atomic_fetch_add(&mule->queued, count);
     cnd_broadcast(&mule->wake_worker);
     return idx + count;
@@ -188,7 +230,6 @@ static int mule_launch(mu_mule *mule)
     if (atomic_load(&mule->running)) return 0;
 
     debugf("mule_launch: starting-threads\n");
-
     for (size_t idx = 0; idx < mule->num_threads; idx++) {
         mule->threads[idx].mule = mule;
         mule->threads[idx].idx = idx;
@@ -207,7 +248,6 @@ static int mule_synchronize(mu_mule *mule)
     size_t queued, processed;
 
     debugf("mule_synchronize: quench-queue\n");
-
     cnd_broadcast(&mule->wake_worker);
 
     /* wait for queue to quench */
@@ -215,18 +255,25 @@ static int mule_synchronize(mu_mule *mule)
     for (;;) {
         struct timespec abstime = { 0 };
         assert(!clock_gettime(CLOCK_REALTIME, &abstime));
-        abstime.tv_nsec += 1000000;
+        abstime = _timespec_add(abstime, mumule_revalidate_queue_complete_ns);
 
         queued = atomic_load_explicit(&mule->queued, __ATOMIC_ACQUIRE);
         processed = atomic_load_explicit(&mule->processed, __ATOMIC_ACQUIRE);
         if (processed < queued) {
             /*
-             * [lost-wakeup-issue]
-             *
-             * dispatcher can pre-empted before cnd_wait so the dispatcher
-             * uses cond_timedwait. needs edge triggered conditions.
+             * +
+             * |
+             * | [queue-processing] -> [queue-complete]
+             * |
+             * | [dispatcher-lost-wakeup] condition change missed by
+             * | the dispatcher if pre-empted before cnd_wait so we
+             * | use cond_timedwait and loop to recheck the condition.
+             *  \
+             *   +
              */
+            tracef("mule_synchronize: queue-processing\n");
             cnd_timedwait(&mule->wake_dispatcher, &mule->mutex, &abstime);
+            tracef("mule_synchronize: dispatcher-woke\n");
         } else {
             break;
         }
@@ -254,7 +301,7 @@ static int mule_shutdown(mu_mule *mule)
     if (!atomic_load(&mule->running)) return 0;
 
     /* shutdown workers */
-    debugf("mule_synchronize: stopping-threads\n");
+    debugf("mule_shutdown: stopping-threads\n");
 
     mtx_lock(&mule->mutex);
     atomic_store_explicit(&mule->running, 0, __ATOMIC_RELEASE);

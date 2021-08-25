@@ -29,6 +29,8 @@ int main(int argc, const char **argv)
 {
     if (argc == 2 && strcmp(argv[1], "-v") == 0) {
         mu_set_debug(1);
+    } else if (argc == 2 && strcmp(argv[1], "-vv") == 0) {
+        mu_set_debug(2);
     }
 
 	t1();

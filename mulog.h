@@ -32,7 +32,8 @@ extern int debug;
 
 static void mu_set_debug(int level) { debug = level; }
 static void log_printf(const char* fmt, ...);
-#define debugf(...) if(debug) log_printf(__VA_ARGS__)
+#define debugf(...) if(debug > 0) log_printf(__VA_ARGS__)
+#define tracef(...) if(debug > 1) log_printf(__VA_ARGS__)
 
 
 /*
