@@ -121,8 +121,18 @@ static inline struct timespec _timespec_add(struct timespec abstime, llong relti
 {
     llong tv_nsec = abstime.tv_nsec + reltime;
     abstime.tv_nsec = tv_nsec % 1000000000;
-    abstime.tv_sec = tv_nsec / 1000000000;
+    abstime.tv_sec += tv_nsec / 1000000000;
     return abstime;
+}
+
+static inline const char* _timespec_string(char *buf, size_t buf_size, struct timespec abstime)
+{
+    struct tm ttm;
+    time_t tsec = abstime.tv_sec;
+    const char tfmt[] = "%Y-%m-%dT%H:%M:%S.";
+    size_t len = strftime(buf, buf_size, tfmt, gmtime_r(&tsec, &ttm));
+    snprintf(buf+len, buf_size-len, "%lldZ", (llong)abstime.tv_nsec);
+    return buf;
 }
 
 static void mule_init(mu_mule *mule, size_t num_threads, mumule_work_fn kernel, void *userdata)
@@ -143,6 +153,7 @@ static int mule_thread(void *arg)
     void* userdata = mule->userdata;
     const size_t thread_idx = thread->idx;
     size_t queued, processing, workitem, processed;
+    char tstr[32];
 
     debugf("mule_thread-%zu: worker-started\n", thread_idx);
     atomic_fetch_add_explicit(&mule->threads_running, 1, __ATOMIC_RELAXED);
@@ -159,7 +170,8 @@ static int mule_thread(void *arg)
         /* sleep on condition if queue empty or exit if asked to stop */
         if (processing == queued)
         {
-            tracef("mule_thread-%zu: queue-empty\n", thread_idx);
+            tracef("mule_thread-%zu: queue-empty (t=%s)\n",
+                thread_idx, _timespec_string(tstr, sizeof(tstr), abstime));
 
             mtx_lock(&mule->mutex);
             if (!atomic_load(&mule->running)) {
@@ -253,6 +265,7 @@ static int mule_start(mu_mule *mule)
 static int mule_sync(mu_mule *mule)
 {
     size_t queued, processed;
+    char tstr[32];
 
     debugf("mule_sync: quench-queue\n");
     cnd_broadcast(&mule->wake_worker);
@@ -278,7 +291,8 @@ static int mule_sync(mu_mule *mule)
              *  \
              *   +
              */
-            tracef("mule_sync: queue-processing\n");
+            tracef("mule_sync: queue-processing (t=%s)\n",
+                _timespec_string(tstr, sizeof(tstr), abstime));
             cnd_timedwait(&mule->wake_dispatcher, &mule->mutex, &abstime);
             tracef("mule_sync: dispatcher-woke\n");
         } else {

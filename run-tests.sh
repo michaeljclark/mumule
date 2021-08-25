@@ -9,7 +9,7 @@ i=0
 count=0
 
 while [ ${i} -lt ${limit} ]; do
-	./build/test_mumule -vv 2>&1 | grep test-complete  >/dev/null
+	./build/test_mumule -v 2>&1 | grep test-complete  >/dev/null
 	if [ $? -eq 0 ]; then count=$(expr $count + 1); fi
 	i=$(expr $i + 1)
 done
