@@ -80,7 +80,19 @@ These definitions give a summary of the _mumule_ data structure:
 ```
 typedef void(*mumule_work_fn)(void *arg, size_t thr_idx, size_t item_idx);
 
-enum { mumule_max_threads = 8 };
+enum {
+    mumule_max_threads = 8,
+
+    /*
+     * condition revalidation timeouts - time between revalidation of the
+     * work available condition for worker threads is 10 ms (100Hz).
+     * if workers are busy they will only perform an atomic increment,
+     * dispatching thread has a shorter timeout in mule_sync. timeouts are
+     * only necessary if thread is pre-empted before calling cnd_timedwait.
+     */
+    mumule_revalidate_work_available_ns = 10000000, /* 10 milliseconds */
+    mumule_revalidate_queue_complete_ns = 1000000,  /* 1 millisecond */
+};
 
 struct mu_thread { mu_mule *mule; size_t idx; thrd_t thread; };
 
