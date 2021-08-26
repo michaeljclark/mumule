@@ -38,11 +38,11 @@ counters within a critical section guarded by the queue mutex, however, the
 goal is to avoid locking and unlocking a mutex which may add up to tens of
 microseconds between each work item.
 
-### queue-complete edge signal
+### queue-complete edge condition
 
-The issue occurs in _mumule_ while attempting to precisely `cnd_signal` the
-_queue-complete_ edge from the worker processing the last item to the
-dispatcher `cnd_wait` in `mule_sync`. The code tries to do this
+A "lost wakeup" can occur in _mumule_ while attempting to `cnd_signal` the
+_queue-complete_ edge condition in the worker processing the last item to
+the dispatcher within `cnd_wait` in `mule_sync`. The code tries to do this
 precisely but the problem occurs between checking the _queue-complete_
 condition and sleeping, whereby one can miss a state change if pre-empted
 between checking the condition _(processed < queued)_ and calling `cnd_wait`
