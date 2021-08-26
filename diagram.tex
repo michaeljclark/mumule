@@ -4,35 +4,45 @@
 \usepackage{lipsum}
 \usepackage{mwe}
 \usetikzlibrary{decorations.pathreplacing,matrix}
-\usetikzlibrary{positioning,automata,arrows,shapes.misc}
+\usetikzlibrary{arrows,arrows.meta,shapes.misc,decorations.pathmorphing}
 \begin{document}
 \hspace{1cm}
 \centering
 
 \begin{minipage}[t]{1.0\linewidth}%
 
-\begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,anchor=base,node distance=2cm,text height=8pt,minimum height=7mm]
+\begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,anchor=base,
+                    node distance=2cm,text height=8pt,minimum height=7mm]
 
 \matrix [matrix of math nodes,
-column sep={2.25cm,between origins},
-row sep={1cm,between origins},
-nodes={minimum height=7mm}]
+         column sep={2.25cm,between origins},
+         row sep={1cm,between origins},
+         nodes={minimum height=7mm}]
 {
-|(producer)[draw,rounded rectangle]| producer & &
-|(worker)[draw,rounded rectangle]| worker & &
+|(producer)[draw,rounded rectangle]| producer &
+|(q1)[draw,rounded rectangle,minimum height=4mm]| cnd1 &
+|(worker)[draw,rounded rectangle]| worker &
+|(q2)[draw,rounded rectangle,minimum height=4mm]| cnd2 &
 |(consumer)[draw,rounded rectangle]| consumer  \\
- & |(q1)| q_1 & & |(q2)| q_2 & \\
-|(queued)[draw,rectangle]| queued & &
-|(processing)[draw,rectangle]| processing & &
- |(processed)[draw,rectangle]| processed \\
+ & & & & \\
+|(queued)[draw,rectangle]| |queued| & &
+|(processing)[draw,rectangle]| |processing| & &
+|(processed)[draw,rectangle]| |processed| \\
 };
 
-  \path (producer) [out=-10,in=190,relative]  edge node {} (queued)
-        (queued)                              edge node {} (worker)
-        (processing)[out=10,in=170,relative]  edge node {} (worker)
-        (worker)                              edge node {} (processing)
-        (worker)    [out=-10,in=190,relative] edge node {} (processed)
-        (processed)                           edge node {} (consumer);
+\path (producer) [out=-10,in=190,relative]  edge node {} (queued)
+      (queued)                              edge node {} (worker)
+      (processing)[out=10,in=170,relative]  edge node {} (worker)
+      (worker)                              edge node {} (processing)
+      (worker)    [out=-10,in=190,relative] edge node {} (processed)
+      (processed)                           edge node {} (consumer);
+
+\draw[-{Latex[length=2mm,width=2mm]},decorate,decoration={coil,
+      aspect=0,segment length=9pt,amplitude=0.75pt},thick]
+      (producer) edge[decorate] (q1)
+      (q1) edge[decorate] (worker)
+      (worker) edge[decorate] (q2)
+      (q2) -- (consumer);
 
 \end{tikzpicture}
 
