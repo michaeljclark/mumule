@@ -15,6 +15,10 @@ submissions, to be run by a pool of threads. _mumule_ use three queue counters:
 `queued`, `processing`, and `processed` and it is up to the caller to provide
 array storage for input and output.
 
+![mumule](diagram.svg)
+
+---
+
 ## lock-free atomics and "the lost wakeup problem"
 
 _mumule_ attempts to be lock-free in the common case, that is the main thread
