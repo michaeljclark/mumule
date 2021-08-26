@@ -236,7 +236,7 @@ static int mule_thread(void *arg)
 static size_t mule_submit(mu_mule *mule, size_t count)
 {
     debugf("mule_submit: queue-start\n");
-    size_t idx = atomic_fetch_add(&mule->queued, count);
+    size_t idx = atomic_fetch_add_explicit(&mule->queued, count, __ATOMIC_SEQ_CST);
     cnd_broadcast(&mule->wake_worker);
     return idx + count;
 }
