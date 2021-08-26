@@ -9,13 +9,13 @@
  - `mule_sync(mule)` to quench the queue
  - `mule_reset(mule)` to clear counters
 
+![mumule](diagram.svg)
+
 _mumule_ is a simple thread worker pool that dispatches one dimension of work
 indices to a kernel function, either in batch or incrementally with multiple
 submissions, to be run by a pool of threads. _mumule_ use three queue counters:
 `queued`, `processing`, and `processed` and it is up to the caller to provide
 array storage for input and output.
-
-![mumule](diagram.svg)
 
 ---
 
