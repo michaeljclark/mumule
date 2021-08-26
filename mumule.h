@@ -201,11 +201,11 @@ static int mule_thread(void *arg)
         }
 
         /* dequeue work-item using compare-and-swap, run, update processed */
-        workitem = processing + 1;
+        workitem_idx = processing + 1;
         if (!atomic_compare_exchange_weak(&mule->processing, &processing,
             workitem)) continue;
         atomic_thread_fence(__ATOMIC_ACQUIRE);
-        (mule->kernel)(userdata, thread_idx, workitem);
+        (mule->kernel)(userdata, thread_idx, workitem_idx);
         atomic_thread_fence(__ATOMIC_RELEASE);
         processed = atomic_fetch_add_explicit(&mule->processed, 1, __ATOMIC_SEQ_CST);
 

@@ -13,9 +13,20 @@
 
 _mumule_ is a simple thread worker pool that dispatches one dimension of work
 indices to a kernel function, either in batch or incrementally with multiple
-submissions, to be run by a pool of threads. _mumule_ use three queue counters:
-`queued`, `processing`, and `processed` and it is up to the caller to provide
-array storage for input and output.
+submissions, to be run by a pool of threads. _mumule_ uses three counters:
+`queued`, `processing`, and `processed`. Kernel execution is ordered with
+respect to the counters. It is up to the caller to provide array storage for
+input and output.
+
+```c
+    /* workitem_idx = processing + 1, updated conditionally using compare-and-swap */
+
+    atomic_thread_fence(__ATOMIC_ACQUIRE);
+    (mule->kernel)(userdata, thread_idx, workitem_idx);
+    atomic_thread_fence(__ATOMIC_RELEASE);
+
+    /* processed = processed + 1, updated unconditionally with fetch-add */
+```
 
 ---
 
