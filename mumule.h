@@ -154,7 +154,7 @@ static int mule_thread(void *arg)
     mu_mule *mule = thread->mule;
     void* userdata = mule->userdata;
     const size_t thread_idx = thread->idx;
-    size_t queued, processing, workitem, processed;
+    size_t queued, processing, processed, workitem_idx;
     char tstr[32];
 
     debugf("mule_thread-%zu: worker-started\n", thread_idx);
@@ -203,7 +203,7 @@ static int mule_thread(void *arg)
         /* dequeue work-item using compare-and-swap, run, update processed */
         workitem_idx = processing + 1;
         if (!atomic_compare_exchange_weak(&mule->processing, &processing,
-            workitem)) continue;
+            workitem_idx)) continue;
         atomic_thread_fence(__ATOMIC_ACQUIRE);
         (mule->kernel)(userdata, thread_idx, workitem_idx);
         atomic_thread_fence(__ATOMIC_RELEASE);
